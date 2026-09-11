@@ -1,5 +1,43 @@
 # dsh-terminal-plugin
 
+English | [中文](#正文从这里开始)
+
+A **VS Code–style bottom terminal panel** for the DeepSeek Harness Web GUI: press
+**Ctrl+`** to toggle it, open as many terminals as you like as tabs, and each one is a
+**real PTY** — colours, cursor addressing, alternate screen, and full-screen programs
+(`vim`, `python`, `top`) all work.
+
+It mounts as a DSH client plugin plus a host plugin:
+
+- **Host half** (`lib/index.js`) owns real terminal sessions through
+  `ctx.subprocess.spawnTerminal` (ConPTY on Windows, a real PTY elsewhere), serves the
+  HTTP + WebSocket wire on the shared web server, and serves the bundled xterm.js as a
+  static asset.
+- **Client half** (`lib/client.js`) puts one terminal button in the composer tool row and
+  renders a panel that occupies **only the centre conversation column** — neither sidebar
+  loses a pixel. Opening the panel with no terminal in sight creates one.
+
+Refresh the page and the terminals are still there: the PTY lives in the host process, and
+a reconnecting browser replays the recent output. Requests reuse the product's own
+Host/Origin + cookie fence, so a `0.0.0.0` deployment does not become a bare remote shell.
+
+```bash
+node scripts/link-deps.mjs   # once: symlink missing deps from the DSH profile
+npm run vendor               # once: copy the xterm.js artifacts into vendor/ (needs network)
+npm run build                # host + client + test bundle + asset manifest
+npm test                     # 65 cases across 5 files
+```
+
+Requires Node 20+, `@deepseek-ai/dsh` with the Web profile, and `ws` (already present in the
+DSH dependency tree). MIT licensed — see [LICENSE](LICENSE); the bundled xterm.js is MIT too
+([LICENSE.xterm](vendor/LICENSE.xterm), [LICENSE.addon-fit](vendor/LICENSE.addon-fit)).
+
+The full documentation below is in Chinese.
+
+---
+
+## 正文从这里开始
+
 在 DeepSeek Harness 的 Web GUI 里加一个 **VSCode 式底部终端**：按 **Ctrl+`** 弹出/收起，
 可以同时开多个终端（标签页），每个都是**真的 PTY** —— 颜色、光标、清屏、备用屏、
 `vim` / `python` / `top` 这类全屏交互程序都能跑。
