@@ -8,6 +8,7 @@ A VS Code-style bottom terminal panel for the DeepSeek Harness (DSH) Web GUI.
 - Run multiple terminal tabs; press `Ctrl+Shift+\`` to create a new one.
 - Uses a real PTY, so colours, cursor control, the alternate screen, and interactive programs such as `vim`, `python`, and `top` work as expected.
 - Occupies only the central conversation area and never squeezes either sidebar.
+- URLs and file paths in the output open with `Ctrl`/`Cmd` + click.
 - Terminal sessions survive page refreshes and replay recent output after reconnecting.
 
 > This is an interactive terminal for the person using the web page. It is separate from DSH agent persistent terminals exposed as `ctx.terminals`.
@@ -65,6 +66,22 @@ Restart `dsh web` after installing or changing the host-side plugin. A browser r
 
 Terminal sessions run in the DSH host process. Refreshing the browser, a brief network interruption, or hiding and reopening the panel does not stop running commands.
 
+### Following links
+
+Links in the output are underlined and show a pointer cursor. **Hold `Ctrl` (`Cmd` on macOS)
+and click** to open one, matching the VS Code integrated terminal:
+
+| Detected | Example | Opens as |
+| --- | --- | --- |
+| URL with a scheme | `http://localhost:3000`, `https://example.com/a?b=1` | a new tab |
+| Bare `localhost` address | `localhost:5173/app` (how dev servers usually print it) | `http://` is added, then a new tab |
+| Absolute file path | `D:\repo\src\index.ts:12:3`, `/home/u/app/main.js:7` | a `file://` address (the line and column are left for the editor) |
+
+For safety only `http`, `https`, and `ftp` are opened; `javascript:`, `data:`, and `file:` are
+never opened, because terminal output is untrusted content and must not become a code-execution
+entry point. Relative paths such as `./a.ts` are not treated as links either, since there is no
+base directory to resolve them against.
+
 ## Configuration
 
 The following options are commonly useful:
@@ -94,6 +111,7 @@ Do not expose the plugin endpoint to untrusted networks or bypass DSH authentica
 - Resizing the panel does not resize an already-running PTY; a newly created terminal uses the current dimensions.
 - Input is shared when the same terminal is open in multiple browser connections, so the intended use is single-user.
 - Only the most recent `scrollbackBytes` of output is replayed; older output cannot be restored.
+- A long URL that the terminal wraps is not joined across lines: each segment is matched on its own, so only the part that is a valid URL by itself can be clicked.
 
 ## Development
 
