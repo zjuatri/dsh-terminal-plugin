@@ -1,0 +1,17 @@
+{
+  "rev": "e7053c18455b8485",
+  "entries": {
+    "xterm.mjs": {
+      "file": "xterm.mjs",
+      "type": "text/javascript; charset=utf-8"
+    },
+    "addon-fit.mjs": {
+      "file": "addon-fit.mjs",
+      "type": "text/javascript; charset=utf-8"
+    },
+    "xterm.css": {
+      "file": "xterm.css",
+      "type": "text/css; charset=utf-8"
+    }
+  }
+}

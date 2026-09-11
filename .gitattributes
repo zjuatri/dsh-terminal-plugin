@@ -1,0 +1,6 @@
+# 归一化换行：vendor/ 与 lib/ 里的产物按字节使用，不能让 Git 在 checkin/checkout 时
+# 改写行尾（xterm.js 的产物里带 sourceMappingURL 一类对字节敏感的内容，改了会显得「脏」）。
+# 源码一律 LF，Windows 上也不额外转 CRLF —— 这个仓库的构建脚本按行解析源码。
+* text=auto eol=lf
+vendor/** -text
+lib/** -text

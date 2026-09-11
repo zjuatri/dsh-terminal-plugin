@@ -1,0 +1,16 @@
+# dsh-terminal-plugin bundle patch — the patch layer this package exports.
+#
+# 由 Web profile 通过一条显式 `file://` 行加载（见
+# `$DSH_HOME/profiles/web/cordis.patch.yml`），所以本文件主要是给正常的
+# `dsh plugin add` 安装用的：一行裸包名就把本插件挂到 profile 根上。
+#
+# 本插件**不发布任何服务**：它把真 PTY 的会话留成模块私有状态，在 Web 服务器上注册
+# 自己的 HTTP/WS 路由（默认前缀 `/dsh-terminal`），并注册客户端槽位（输入框按钮、
+# 底部面板、侧边栏入口）。硬依赖只有 `webServer` 与 `subprocess`，两者都在 shipped
+# Web profile 里，因此不需要 `isolate` realm。
+#
+# 它取代「产品自己的终端界面」吗？不。`@deepseek-ai/dsh-terminal` 是给 agent 用的持久
+# 终端，本插件是给人用的交互终端，两者可以同时存在（本插件不碰 `ctx.terminals`）。
+- insert:
+    - id: dsh-terminal-plugin
+      name: 'dsh-terminal-plugin'
