@@ -1,0 +1,92 @@
+# dsh-terminal-plugin
+
+[English](README.en.md) | [中文](README.md)
+
+A VS Code-style bottom terminal panel for the DeepSeek Harness (DSH) Web GUI.
+
+- Press `Ctrl+\`` to show or hide the panel.
+- Run multiple terminal tabs; press `Ctrl+Shift+\`` to create a new one.
+- Uses a real PTY, so colours, cursor control, the alternate screen, and interactive programs such as `vim`, `python`, and `top` work as expected.
+- Occupies only the central conversation area and never squeezes either sidebar.
+- Terminal sessions survive page refreshes and replay recent output after reconnecting.
+
+> This is an interactive terminal for the person using the web page. It is separate from DSH agent persistent terminals exposed as `ctx.terminals`.
+
+## Requirements
+
+- Node.js 20 or later
+- `@deepseek-ai/dsh` installed with the Web profile
+- PowerShell 7 on Windows (recommended; Windows PowerShell is used as a fallback)
+
+`ws` is installed as a package dependency. Building also requires linking peer dependencies from the DSH profile.
+
+## Install and build
+
+Run the following from the repository root:
+
+```bash
+npm run link-deps  # once: link dependencies from the DSH profile
+npm run vendor     # once: download and copy xterm.js assets
+npm run build      # build the host, client, and static assets
+npm test           # run the test suite
+```
+
+When installed with `dsh plugin add`, the bundled `cordis.patch.yml` registers the plugin. To use a local checkout, add the following entry to the Web profile's `cordis.patch.yml`:
+
+```yaml
+- insert:
+    - id: dsh-terminal-plugin
+      name: "file:///absolute/path/to/dsh-terminal-plugin/lib/index.js"
+```
+
+Restart `dsh web` after installing or changing the host-side plugin. A browser refresh is sufficient for client-only UI changes.
+
+## Usage
+
+1. Open the DSH Web GUI, then click the terminal button in the composer toolbar or press `Ctrl+\``.
+2. The first open automatically creates a terminal. Use the `+` button in the panel toolbar to add tabs.
+3. New terminals use the workspace associated with the current session as their working directory. If that cannot be determined, they fall back to the DSH process working directory.
+4. By default, closing the final tab immediately creates a replacement so the visible panel is never empty. Hide the panel with `Ctrl+\`` when it is not needed.
+
+Terminal sessions run in the DSH host process. Refreshing the browser, a brief network interruption, or hiding and reopening the panel does not stop running commands.
+
+## Configuration
+
+The following options are commonly useful:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `mountPrefix` | `/dsh-terminal` | HTTP and WebSocket path prefix for the plugin |
+| `shellPath` | auto-detected | Absolute path to the interactive shell |
+| `shellArgs` | auto-selected | Shell start-up arguments |
+| `cwd` | current workspace | Working directory for new terminals; supports the `{cwd}` placeholder |
+| `env` | `{}` | Additional environment variables |
+| `rows` / `cols` | `24` / `80` | Initial terminal dimensions |
+| `scrollbackBytes` | `262144` | Output bytes retained for reconnect replay |
+| `idleCloseAfterMs` | `0` | Time without attachments before closing; `0` disables automatic closing |
+| `maxTerminals` | `20` | Maximum simultaneous terminal sessions |
+
+See [`src/config.ts`](src/config.ts) for the complete configuration definition.
+
+## Security
+
+A terminal is equivalent to a shell opened by the user on the host machine, so only trusted users should have access. Its HTTP and WebSocket requests reuse DSH Web's Host/Origin checks and Cookie authentication. In the uncommon environments where that capability is unavailable, only loopback requests are accepted.
+
+Do not expose the plugin endpoint to untrusted networks or bypass DSH authentication.
+
+## Known limitations
+
+- Resizing the panel does not resize an already-running PTY; a newly created terminal uses the current dimensions.
+- Input is shared when the same terminal is open in multiple browser connections, so the intended use is single-user.
+- Only the most recent `scrollbackBytes` of output is replayed; older output cannot be restored.
+
+## Development
+
+Source files are in `src/`; build artifacts are in `lib/`. Before committing, run:
+
+```bash
+npm run build
+npm test
+```
+
+The project is licensed under [MIT](LICENSE). Bundled xterm.js and its add-on are also MIT licensed; see [`vendor/README.md`](vendor/README.md).

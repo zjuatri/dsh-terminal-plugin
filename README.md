@@ -1,5 +1,7 @@
 # dsh-terminal-plugin
 
+[English](README.en.md) | 中文
+
 为 DeepSeek Harness（DSH）Web GUI 提供一个 VS Code 风格的底部终端面板。
 
 - 按 `Ctrl+\`` 打开或收起面板
