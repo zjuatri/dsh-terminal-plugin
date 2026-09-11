@@ -15,7 +15,7 @@ A VS Code-style bottom terminal panel for the DeepSeek Harness (DSH) Web GUI.
 ## Requirements
 
 - Node.js 20 or later
-- `@deepseek-ai/dsh` installed with the Web profile
+- `@deepseek-ai/dsh` with the Web profile, installed or runnable through `npx`
 - PowerShell 7 on Windows (recommended; Windows PowerShell is used as a fallback)
 
 `ws` is installed as a package dependency. Building also requires linking peer dependencies from the DSH profile.
@@ -31,7 +31,22 @@ npm run build      # build the host, client, and static assets
 npm test           # run the test suite
 ```
 
-When installed with `dsh plugin add`, the bundled `cordis.patch.yml` registers the plugin. To use a local checkout, add the following entry to the Web profile's `cordis.patch.yml`:
+This repository contains only the plugin; it does not provide the `dsh` command. First confirm that the DSH CLI is available:
+
+```bash
+npx @deepseek-ai/dsh --help
+```
+
+Use the DSH CLI to add the package to the Web profile and mount the bundled `cordis.patch.yml`:
+
+```bash
+npx @deepseek-ai/dsh plugin --profile web add /path/to/dsh-terminal-plugin
+npx @deepseek-ai/dsh plugin --profile web add git+https://github.com/zjuatri/dsh-terminal-plugin.git
+```
+
+If `@deepseek-ai/dsh` is installed globally, replace `npx @deepseek-ai/dsh` at the start of each command with `dsh`.
+
+For a local checkout that needs to be mounted manually, add the following entry to the Web profile's `cordis.patch.yml`:
 
 ```yaml
 - insert:

@@ -15,7 +15,7 @@
 ## 环境要求
 
 - Node.js 20 或更高版本
-- 已安装带 Web profile 的 `@deepseek-ai/dsh`
+- 已安装或可通过 `npx` 运行带 Web profile 的 `@deepseek-ai/dsh`
 - PowerShell 7（Windows 推荐；缺失时会回退到 Windows PowerShell）
 
 `ws` 会随本插件依赖安装；构建时还需要从 DSH profile 链接 peer dependencies。
@@ -31,8 +31,22 @@ npm run build      # 构建宿主、客户端和静态资源
 npm test           # 运行测试
 ```
 
-用 `dsh plugin add` 安装时，包内的 `cordis.patch.yml` 会注册插件。若使用本地源码，可在 Web
-profile 的 `cordis.patch.yml` 中加入下面这一项：
+本仓库只包含插件，不提供 `dsh` 命令。先用下列命令确认 DSH CLI 可以运行：
+
+```bash
+npx @deepseek-ai/dsh --help
+```
+
+推荐通过 DSH CLI 将插件装入 Web profile；它会加载包内的 `cordis.patch.yml`：
+
+```bash
+npx @deepseek-ai/dsh plugin --profile web add /path/to/dsh-terminal-plugin
+npx @deepseek-ai/dsh plugin --profile web add git+https://github.com/zjuatri/dsh-terminal-plugin.git
+```
+
+如果你已全局安装 `@deepseek-ai/dsh`，可将上面命令开头的 `npx @deepseek-ai/dsh` 换成 `dsh`。
+
+若使用本地源码且需要手动挂载，可在 Web profile 的 `cordis.patch.yml` 中加入下面这一项：
 
 ```yaml
 - insert:
