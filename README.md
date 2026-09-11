@@ -8,6 +8,7 @@
 - 支持多终端标签和 `Ctrl+Shift+\`` 新建终端
 - 使用真实 PTY：颜色、光标控制、备用屏以及 `vim`、`python`、`top` 等交互程序均可正常运行
 - 终端面板只占中间对话区，不会挤压左右侧边栏
+- 输出里的 URL 与文件路径可以 `Ctrl`/`Cmd` + 点击打开
 - 刷新页面后终端仍会保留，并回放近期输出
 
 > 这是供页面使用者操作的终端，不是 DSH agent 使用的 `ctx.terminals` 持久终端。
@@ -65,6 +66,21 @@ npx @deepseek-ai/dsh plugin --profile web add git+https://github.com/zjuatri/dsh
 
 终端会话运行在 DSH 宿主进程中，因此浏览器刷新、短暂断网或重新打开面板都不会终止正在运行的命令。
 
+### 点击链接
+
+输出里的链接会带下划线并显示手型光标，**按住 `Ctrl`（macOS 为 `Cmd`）点击**即可打开，
+与 VS Code 集成终端一致：
+
+| 识别对象 | 例子 | 打开方式 |
+| --- | --- | --- |
+| 带协议的 URL | `http://localhost:3000`、`https://example.com/a?b=1` | 新标签页 |
+| 裸 `localhost` 地址 | `localhost:5173/app`（dev server 常见写法） | 补上 `http://` 后新标签页 |
+| 绝对文件路径 | `D:\repo\src\index.ts:12:3`、`/home/u/app/main.js:7` | `file://` 地址（行号列号留给编辑器定位） |
+
+出于安全考虑，只有 `http` / `https` / `ftp` 协议会被打开，`javascript:`、`data:`、`file:`
+一律不打开 —— 终端输出属于不可信内容，不能让它拿到一个执行入口。相对路径（`./a.ts`）
+因为没有基准目录，也不会被当作链接。
+
 ## 配置
 
 在插件配置中可设置以下常用项：
@@ -95,6 +111,7 @@ DSH Web 的 Host/Origin 校验和 Cookie 认证；在缺少该能力的少数组
 - 拖动面板高度不会调整已运行 PTY 的行列数；新建终端会采用当时的尺寸。
 - 同一终端在多个浏览器连接中同时打开时，输入会共享，适合单人使用场景。
 - 输出回放只保留最近 `scrollbackBytes` 字节，较早内容无法恢复。
+- 被终端折行的长 URL 不会跨行拼接：折行处两段各自识别，只能点到能独立成 URL 的那一段。
 
 ## 开发说明
 

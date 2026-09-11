@@ -17,6 +17,7 @@ import { h, useEffect, useRef, useState } from './react.js'
 import { TerminalConnection, type ConnectionState } from './pty-client.js'
 import { currentXtermTheme, observeTheme, type XtermTheme } from './theme.js'
 import { loadXterm, type FitAddonLike, type XtermTerminal } from './xterm-loader.js'
+import { attachLinkProvider } from './link-provider.js'
 import type { Translate } from './text.js'
 
 /** 一个终端画面的 props。 */
@@ -157,10 +158,19 @@ export function TerminalView(props: TerminalViewProps): unknown {
         terminal.options.theme = theme
       })
 
+      // 链接识别：Ctrl/Cmd + 点击打开输出里的 URL / 文件路径。
+      const detachLinks = attachLinkProvider(terminal, {
+        readLine: (lineNumber) => {
+          const line = terminal.buffer?.active?.getLine?.(lineNumber)
+          return line?.translateToString?.(true)
+        },
+      })
+
       teardown = () => {
         observer.disconnect()
         if (timer !== null) clearTimeout(timer)
         stopTheme()
+        detachLinks()
         dataSub.dispose()
         titleSub.dispose()
       }

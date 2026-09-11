@@ -31,6 +31,7 @@ import * as wireModule from './wire.js'
 import * as stylesModule from './client/styles.js'
 import * as frameInsetModule from './client/frame-inset.js'
 import * as stateModule from './client/state.js'
+import * as linkModule from './client/link-provider.js'
 
 // ── 配置 ────────────────────────────────────────────────────────────────────
 /** @see ./config.ts */
@@ -103,3 +104,15 @@ export const sidebarRightEdge = frameInsetModule.sidebarRightEdge
 export const createTerminalPanelStore = stateModule.createTerminalPanelStore
 /** @see ./client/state.ts */
 export const clampHeight = stateModule.clampHeight
+
+// ── 客户端链接识别 ──────────────────────────────────────────────────────────
+/** @see ./client/link-provider.ts */
+export const detectLinks = linkModule.detectLinks
+/** @see ./client/link-provider.ts */
+export const openableUrl = linkModule.openableUrl
+/** @see ./client/link-provider.ts */
+export const fileUrlForPath = linkModule.fileUrlForPath
+/** @see ./client/link-provider.ts */
+export const createLinkProvider = linkModule.createLinkProvider
+/** @see ./client/link-provider.ts */
+export const attachLinkProvider = linkModule.attachLinkProvider

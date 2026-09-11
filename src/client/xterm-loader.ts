@@ -25,10 +25,18 @@ export interface XtermTerminal {
   focus(): void
   dispose(): void
   loadAddon(addon: unknown): void
+  /** 注册链接识别（Ctrl/Cmd + 点击触发）。 */
+  registerLinkProvider?(provider: unknown): { dispose(): void }
   onData(listener: (data: string) => void): { dispose(): void }
   onTitleChange(listener: (title: string) => void): { dispose(): void }
   onResize(listener: (size: { cols: number; rows: number }) => void): { dispose(): void }
   options: Record<string, unknown>
+  /** 缓冲区：链接识别要按行号取文本。 */
+  buffer?: {
+    active?: {
+      getLine?(line: number): { translateToString?(trimRight?: boolean): string } | undefined
+    }
+  }
 }
 
 /** fit addon 的实例面。 */
