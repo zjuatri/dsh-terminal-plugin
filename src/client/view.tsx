@@ -17,7 +17,8 @@ import { h, useEffect, useRef, useState } from './react.js'
 import { TerminalConnection, type ConnectionState } from './pty-client.js'
 import { currentXtermTheme, observeTheme, type XtermTheme } from './theme.js'
 import { loadXterm, type FitAddonLike, type XtermTerminal } from './xterm-loader.js'
-import { attachLinkProvider } from './link-provider.js'
+import { attachLinkProvider, readBufferLine } from './link-provider.js'
+import { attachContextMenu } from './clipboard.js'
 import type { Translate } from './text.js'
 
 /** 一个终端画面的 props。 */
@@ -159,18 +160,22 @@ export function TerminalView(props: TerminalViewProps): unknown {
       })
 
       // 链接识别：Ctrl/Cmd + 点击打开输出里的 URL / 文件路径。
+      // 门控在 provider 的 activate 里（悬停照样有下划线，按 Ctrl 点才打开），见 link-provider.ts。
       const detachLinks = attachLinkProvider(terminal, {
-        readLine: (lineNumber) => {
-          const line = terminal.buffer?.active?.getLine?.(lineNumber)
-          return line?.translateToString?.(true)
-        },
+        // 行号口径（1 基的绝对行 → getLine 的 0 基下标）与列口径由 readBufferLine 统一。
+        readLine: lineNumber => readBufferLine(terminal.buffer?.active, lineNumber),
+        hint: url => callbacks.current.t('panel.linkHint', { url }),
       })
+
+      // 右键：有选中就复制，没选中就粘贴（浏览器默认菜单被接管掉）。
+      const detachContextMenu = attachContextMenu(terminal, container)
 
       teardown = () => {
         observer.disconnect()
         if (timer !== null) clearTimeout(timer)
         stopTheme()
         detachLinks()
+        detachContextMenu()
         dataSub.dispose()
         titleSub.dispose()
       }

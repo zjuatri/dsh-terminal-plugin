@@ -105,10 +105,56 @@ describe('终端链接识别', () => {
     const huge = `/${'a'.repeat(600)}.ts`
     assert.deepEqual(detectLinks(huge), [])
   })
+
+  test('Next.js banner：`(Turbopack)` 不是链接', async () => {
+    const { detectLinks } = await loadSelftest()
+    // 曾经的 bug：扩展名只要求 1 位，`Turbopack)` 里最后那位 `k` 被当成盘符，
+    // 切出 `/Turbopack` 并算成绝对路径 —— 点它会去打开 file:///Turbopack。
+    assert.deepEqual(detectLinks('▲ Next.js 16.2.3 (Turbopack)'), [])
+    assert.deepEqual(detectLinks('✓ Ready in 338ms'), [])
+    assert.deepEqual(detectLinks('- Environments: .env.local'), [])
+  })
+
+  test('Next.js banner：每条 URL 的地址与文本一一对应（防「点 A 开 B」）', async () => {
+    const { detectLinks } = await loadSelftest()
+    const banner = [
+      '   ▲ Next.js 16.2.3 (Turbopack)',
+      '   - Local:        http://localhost:3000',
+      '   - Network:      http://198.18.0.1:3000',
+      '   - Environments: .env.local',
+    ]
+    for (const line of banner) {
+      for (const link of detectLinks(line)) {
+        // 用同一套下标反切回文本，它必须与 link.text 逐字相同，地址也必须正好由它得来。
+        const slice = line.slice(link.startIndex, link.endIndex)
+        assert.equal(slice, link.text, `行：${line}`)
+        const expected = link.text.startsWith('http')
+          ? `${link.text}/`
+          : undefined
+        if (expected !== undefined) assert.equal(link.url, expected, `行：${line}`)
+      }
+    }
+    // 两个地址行各自只有一条链接，且互不混淆。
+    assert.deepEqual(
+      detectLinks('   - Local:        http://localhost:3000').map(link => link.url),
+      ['http://localhost:3000/'],
+    )
+    assert.deepEqual(
+      detectLinks('   - Network:      http://198.18.0.1:3000').map(link => link.url),
+      ['http://198.18.0.1:3000/'],
+    )
+  })
+
+  test('扩展名至少两位：`/a.ts` 命中，`/Turbopack` 不命中', async () => {
+    const { detectLinks } = await loadSelftest()
+    assert.deepEqual(detectLinks('at /a.ts').map(link => link.text), ['/a.ts'])
+    assert.deepEqual(detectLinks('see /Turbopack'), [])
+    assert.deepEqual(detectLinks('open C:\\x\\a.ts:12').map(link => link.url), ['file:///C:/x/a.ts'])
+  })
 })
 
 describe('xterm link provider', () => {
-  test('给一行造出链接：范围按 1 基列，带下划线与指针；Ctrl+点击走 activate', async () => {
+  test('给一行造出链接：范围按 1 基列，带下划线与指针', async () => {
     const { createLinkProvider } = await loadSelftest()
     const opened = []
     const lines = {
@@ -131,8 +177,67 @@ describe('xterm link provider', () => {
     assert.equal(link.range.end.x, link.range.start.x + link.text.length - 1)
     assert.deepEqual(link.decorations, { pointerCursor: true, underline: true })
     assert.equal(opened.length, 0, '只提供链接不该打开任何东西')
-    link.activate(new Event('click'), link.text)
-    assert.deepEqual(opened, ['http://localhost:3000/'])
+  })
+
+  test('要按 Ctrl 才打开：不按修饰键的点击什么都不做', async () => {
+    const { createLinkProvider, isFollowClick } = await loadSelftest()
+    const opened = []
+    const provider = createLinkProvider({
+      readLine: () => '  - Local: http://localhost:3000',
+      open: url => { opened.push(url) },
+    })
+    let links
+    provider.provideLinks(1, result => { links = result })
+    const [link] = links
+    link.activate({ type: 'mouseup' }, link.text)
+    assert.deepEqual(opened, [], '普通点击不该打开链接（这正是之前的 bug）')
+    link.activate({ type: 'mouseup', ctrlKey: true }, link.text)
+    assert.deepEqual(opened, ['http://localhost:3000/'], 'Ctrl+点击才打开')
+    // 修饰键的判断按平台走：macOS 认 Cmd，其它平台认 Ctrl。
+    const mac = /mac|iphone|ipad|ipod/iu.test(globalThis.navigator?.platform ?? '')
+    assert.equal(isFollowClick({ ctrlKey: true }), !mac)
+    assert.equal(isFollowClick({ metaKey: true }), mac)
+    assert.equal(isFollowClick(undefined), false, '没有事件时当作没按')
+  })
+
+  test('悬停提示：给了 hint 就写 title，离开时清掉', async () => {
+    const { createLinkProvider } = await loadSelftest()
+    const target = { title: '' }
+    const provider = createLinkProvider({
+      readLine: () => 'see http://localhost:3000 now',
+      hint: url => `Ctrl+点击打开 ${url}`,
+      hoverTarget: target,
+      open: () => {},
+    })
+    let links
+    provider.provideLinks(1, result => { links = result })
+    const [link] = links
+    assert.equal(typeof link.hover, 'function')
+    assert.equal(typeof link.leave, 'function')
+    link.hover({ type: 'mousemove' }, link.text)
+    assert.equal(target.title, 'Ctrl+点击打开 http://localhost:3000/')
+    link.leave({ type: 'mousemove' }, link.text)
+    assert.equal(target.title, '')
+  })
+
+  test('不可打开的条目（协议被拒）没有提示，也不会打开', async () => {
+    const { createLinkProvider } = await loadSelftest()
+    const opened = []
+    const target = { title: '' }
+    const provider = createLinkProvider({
+      readLine: () => 'see data://example.com/x now',
+      hint: url => url,
+      hoverTarget: target,
+      open: url => { opened.push(url) },
+    })
+    let links
+    provider.provideLinks(1, result => { links = result })
+    // `data://…` 会被识别成一条「只标注、不可打开」的链接。
+    for (const link of links ?? []) {
+      assert.equal(typeof link.hover, 'undefined', '不可打开的条目不提示')
+      link.activate({ type: 'mouseup', ctrlKey: true }, link.text)
+    }
+    assert.deepEqual(opened, [])
   })
 
   test('没有链接或读不到行时回调 undefined', async () => {
@@ -156,17 +261,23 @@ describe('xterm link provider', () => {
     assert.equal(result, undefined)
   })
 
-  test('attachLinkProvider 把 provider 注册进终端并返回可释放的函数', async () => {
+  test('attachLinkProvider 把 provider 注册进终端、带上 hoverTarget，并返回可释放的函数', async () => {
     const { attachLinkProvider } = await loadSelftest()
     const registered = []
     let disposed = 0
+    const element = { title: '' }
     const detach = attachLinkProvider({
+      element,
       registerLinkProvider(provider) {
         registered.push(provider)
         return { dispose() { disposed += 1 } }
       },
-    }, { readLine: () => 'http://a.dev' })
-    assert.equal(registered.length, 1)
+    }, { readLine: () => 'http://a.dev', hint: url => url })
+    assert.equal(registered.length, 1, '只注册一次')
+    let links
+    registered[0].provideLinks(1, result => { links = result })
+    links[0].hover({ type: 'mousemove' }, links[0].text)
+    assert.equal(element.title, 'http://a.dev/', 'element 被当成默认的提示宿主')
     detach()
     assert.equal(disposed, 1)
   })

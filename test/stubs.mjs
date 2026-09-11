@@ -43,10 +43,19 @@ function makeCssStyle(element) {
   }
 }
 
+/**
+ * 极简 `Node` 基类。
+ *
+ * 产品代码里会用 `node instanceof Node` 区分「右键落在终端里还是别的地方」，所以替身不能让
+ * 这个判断永远为 false；测试前把它装到 `globalThis.Node` 上（见 `installDom`）。
+ */
+export class FakeNode {}
+
 /** 一个极简元素。 */
-class FakeElement {
+class FakeElement extends FakeNode {
   /** @param {string} tagName 标签名。 */
   constructor(tagName) {
+    super()
     this.tagName = tagName.toUpperCase()
     /** @type {Record<string, string>} */
     this.dataset = {}
@@ -113,6 +122,21 @@ class FakeElement {
     return this.attributes.has(name)
   }
 
+  /**
+   * 判断一个节点是否在自己的子树里（产品代码靠它区分「右键落在终端里还是别处」）。
+   *
+   * @param {FakeNode | null} node 候选节点。
+   * @returns {boolean} 是否包含。
+   */
+  contains(node) {
+    let current = node
+    while (current !== null && current !== undefined) {
+      if (current === this) return true
+      current = current.parentElement ?? null
+    }
+    return false
+  }
+
   /** @param {string} name 选择器（只支持 `tag[data-plugin="x"]` 这一种）。 */
   querySelector(name) {
     const match = /^(\w+)\[data-plugin="([^"]+)"\]$/u.exec(name)
@@ -147,8 +171,19 @@ class FakeElement {
     this.listeners.set(type, list.filter(item => item !== handler))
   }
 
-  /** 触发一次事件。 @param {string} type 事件名。 @param {unknown} event 事件对象。 */
+  /**
+   * 触发一次事件。
+   *
+   * 真实浏览器会在派发时填 `event.target`（捕获阶段监听器靠它判断事件落在哪），替身里由
+   * 第一个被派发的元素补上；冒泡到祖先时 `target` 保持指向最初的目标。
+   *
+   * @param {string} type 事件名。
+   * @param {unknown} event 事件对象。
+   */
   dispatch(type, event) {
+    if (typeof event === 'object' && event !== null && !('target' in event)) {
+      event.target = this
+    }
     for (const handler of this.listeners.get(type) ?? []) handler(event)
   }
 
@@ -268,8 +303,11 @@ export function installDom() {
   const previousWindow = globalThis.window
   const previousFetch = globalThis.fetch
   const previousLocalStorage = globalThis.localStorage
+  const previousNode = globalThis.Node
   globalThis.document = document
   globalThis.window = window
+  // 产品代码用 `instanceof Node` 判断事件目标，替身必须能通过这个判断。
+  globalThis.Node = FakeNode
   globalThis.MutationObserver = class {
     /** 替身不观察任何东西。 */
     observe() {}
@@ -291,11 +329,29 @@ export function installDom() {
     fire(type, event) {
       document.dispatch(type, event)
     },
+    /**
+     * 在一个元素上触发事件，并沿 `parentElement` 冒泡。
+     *
+     * 替身的 `dispatch` 只调本元素的监听器，所以像「容器用捕获阶段监听子元素的右键」这种
+     * 真实用法需要这里补上冒泡，否则测试会因为「监听器没被叫到」而误判成产品代码有问题。
+     *
+     * @param {object} element 目标元素。
+     * @param {string} type 事件名。
+     * @param {object} event 事件对象。
+     */
+    bubble(element, type, event) {
+      let node = element
+      while (node !== null && node !== undefined) {
+        node.dispatch(type, event)
+        node = node.parentElement
+      }
+    },
     cleanup() {
       globalThis.document = previousDocument
       globalThis.window = previousWindow
       globalThis.fetch = previousFetch
       globalThis.localStorage = previousLocalStorage
+      globalThis.Node = previousNode
     },
   }
 }

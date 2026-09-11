@@ -95,4 +95,77 @@ describe('链接范围（真 xterm buffer）', () => {
     const [row] = await feedXterm('  plain output, nothing here\r\n', 1)
     assert.deepEqual(row.links, [])
   })
+
+  test('行号口径：xterm 的 1 基绝对行号读到的就是那一行（点 A 不会开 B）', async () => {
+    const { Terminal } = await import(pathToFileURL(join(root, 'vendor/xterm.mjs')).href)
+    const { readBufferLine, createLinkProvider } = await import(pathToFileURL(join(root, 'lib/selftest.js')).href)
+    const terminal = new Terminal({ cols: 80, rows: 8 })
+    await new Promise(resolveWrite => {
+      terminal.write('  \u25b2 Next.js 16.2.3 (Turbopack)\r\n  - Local:   http://localhost:3000\r\n  - Network: http://198.18.0.1:3000\r\n', resolveWrite)
+    })
+    const buffer = terminal.buffer.active
+    try {
+      // xterm 给的 bufferLineNumber 是 1 基的绝对行号；读回来的必须是同一行。
+      assert.equal(readBufferLine(buffer, 1)?.text, '  \u25b2 Next.js 16.2.3 (Turbopack)')
+      assert.equal(readBufferLine(buffer, 2)?.text, '  - Local:   http://localhost:3000')
+      assert.equal(readBufferLine(buffer, 3)?.text, '  - Network: http://198.18.0.1:3000')
+      assert.equal(readBufferLine(buffer, 0), undefined, '越界的行号读不到东西')
+      assert.equal(readBufferLine(undefined, 1), undefined, '没有 buffer 时不该抛错')
+
+      // 端到端：对每一行问一次 provider，拿到的地址必须是**那一行**的地址。
+      const provider = createLinkProvider({
+        readLine: line => readBufferLine(buffer, line),
+        isEnabled: () => true,
+        open: () => {},
+      })
+      const asked = []
+      for (const line of [1, 2, 3]) {
+        provider.provideLinks(line, links => { asked.push({ line, links }) })
+      }
+      assert.deepEqual(asked[0].links, undefined, 'banner 行没有链接')
+      assert.deepEqual(asked[1].links.map(link => link.text), ['http://localhost:3000'])
+      assert.deepEqual(asked[2].links.map(link => link.text), ['http://198.18.0.1:3000'])
+      // 链接的行号跟着 bufferLineNumber，与 xterm 画下划线用的是同一套口径。
+      for (const { line, links } of asked) {
+        for (const link of links ?? []) assert.equal(link.range.start.y, line)
+      }
+    } finally {
+      terminal.dispose()
+    }
+  })
+
+  test('列口径：宽字符（中文）把 URL 的列推后，点中 URL 才会命中', async () => {
+    const { Terminal } = await import(pathToFileURL(join(root, 'vendor/xterm.mjs')).href)
+    const { readBufferLine, createLinkProvider } = await import(pathToFileURL(join(root, 'lib/selftest.js')).href)
+    const terminal = new Terminal({ cols: 40, rows: 4 })
+    const line = '中文中文 http://localhost:3000'
+    await new Promise(resolveWrite => { terminal.write(`${line}\r\n`, resolveWrite) })
+    const buffer = terminal.buffer.active
+    try {
+      const read = readBufferLine(buffer, 1)
+      assert.equal(read.text, line)
+      assert.ok(Array.isArray(read.columns), '真 xterm 的格子信息要能建出列对照表')
+
+      const provider = createLinkProvider({
+        readLine: number => readBufferLine(buffer, number),
+        isEnabled: () => true,
+        open: () => {},
+      })
+      let links
+      provider.provideLinks(1, result => { links = result })
+      assert.equal(links.length, 1)
+      const [link] = links
+      // 4 个中文字各占 2 列 → URL 从第 10 列（1 基）开始，而不是字符串下标算出的第 6 列。
+      assert.equal(link.range.start.x, 10, '起点列号要算上宽字符多占的格子')
+      assert.equal(link.range.end.x, line.length + 4, '终点列号同理')
+      // 把列范围反切回 buffer 的格子：切出来的必须就是那条 URL。
+      const cells = []
+      for (let column = link.range.start.x - 1; column <= link.range.end.x - 1; column += 1) {
+        cells.push(buffer.getLine(0).getCell(column).getChars() || ' ')
+      }
+      assert.equal(cells.join(''), 'http://localhost:3000')
+    } finally {
+      terminal.dispose()
+    }
+  })
 })

@@ -32,6 +32,7 @@ import * as stylesModule from './client/styles.js'
 import * as frameInsetModule from './client/frame-inset.js'
 import * as stateModule from './client/state.js'
 import * as linkModule from './client/link-provider.js'
+import * as clipboardModule from './client/clipboard.js'
 
 // ── 配置 ────────────────────────────────────────────────────────────────────
 /** @see ./config.ts */
@@ -116,3 +117,11 @@ export const fileUrlForPath = linkModule.fileUrlForPath
 export const createLinkProvider = linkModule.createLinkProvider
 /** @see ./client/link-provider.ts */
 export const attachLinkProvider = linkModule.attachLinkProvider
+/** @see ./client/link-provider.ts */
+export const isFollowClick = linkModule.isFollowClick
+/** @see ./client/link-provider.ts */
+export const readBufferLine = linkModule.readBufferLine
+
+// ── 客户端剪贴板 ────────────────────────────────────────────────────────────
+/** @see ./client/clipboard.ts */
+export const attachContextMenu = clipboardModule.attachContextMenu

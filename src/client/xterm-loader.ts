@@ -19,14 +19,26 @@ import { assetUrl } from './bootstrap.js'
 export interface XtermTerminal {
   readonly cols: number
   readonly rows: number
+  /** 终端根元素（右键接管要用它判断区域，链接刷新要它的几何）。 */
+  readonly element?: HTMLElement | undefined
+  /** 终端里的隐藏 textarea（保留给诊断用）。 */
+  readonly textarea?: HTMLTextAreaElement | undefined
   open(container: HTMLElement): void
   write(data: string): void
   writeln(data: string): void
+  /** 按粘贴语义写入（bracketed paste + 换行转换），右键粘贴走它。 */
+  paste?(data: string): void
   focus(): void
   dispose(): void
   loadAddon(addon: unknown): void
   /** 注册链接识别（Ctrl/Cmd + 点击触发）。 */
   registerLinkProvider?(provider: unknown): { dispose(): void }
+  /** 当前是否有选中内容。 */
+  hasSelection?(): boolean
+  /** 取选中内容。 */
+  getSelection?(): string
+  /** 清掉选区。 */
+  clearSelection?(): void
   onData(listener: (data: string) => void): { dispose(): void }
   onTitleChange(listener: (title: string) => void): { dispose(): void }
   onResize(listener: (size: { cols: number; rows: number }) => void): { dispose(): void }
@@ -34,7 +46,11 @@ export interface XtermTerminal {
   /** 缓冲区：链接识别要按行号取文本。 */
   buffer?: {
     active?: {
-      getLine?(line: number): { translateToString?(trimRight?: boolean): string } | undefined
+      getLine?(line: number): {
+        translateToString?(trimRight?: boolean): string
+        /** 读一格的宽度与字符：宽字符（CJK）占两列，链接的列号要靠它换算。 */
+        getCell?(column: number): { getWidth?(): number; getChars?(): string } | undefined
+      } | undefined
     }
   }
 }

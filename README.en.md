@@ -9,6 +9,7 @@ A VS Code-style bottom terminal panel for the DeepSeek Harness (DSH) Web GUI.
 - Uses a real PTY, so colours, cursor control, the alternate screen, and interactive programs such as `vim`, `python`, and `top` work as expected.
 - Occupies only the central conversation area and never squeezes either sidebar.
 - URLs and file paths in the output open with `Ctrl`/`Cmd` + click.
+- Right-click follows the VS Code habit: copies when there is a selection, pastes when there is not.
 - Terminal sessions survive page refreshes and replay recent output after reconnecting.
 
 > This is an interactive terminal for the person using the web page. It is separate from DSH agent persistent terminals exposed as `ctx.terminals`.
@@ -81,6 +82,25 @@ For safety only `http`, `https`, and `ftp` are opened; `javascript:`, `data:`, a
 never opened, because terminal output is untrusted content and must not become a code-execution
 entry point. Relative paths such as `./a.ts` are not treated as links either, since there is no
 base directory to resolve them against.
+
+Hovering a link shows the underline, a pointer cursor, and a “Ctrl+click to open …” hint. A plain
+click **without** the modifier opens nothing and never leaks through to the terminal selection.
+Link hit areas are computed in terminal **columns**, so wide characters (CJK) that occupy two
+cells do not shift the link sideways.
+
+### Right-click: copy when there is a selection, paste when there is not
+
+Right-clicks inside the terminal are handled by the plugin, matching the VS Code integrated
+terminal (the browser's own context menu does not appear):
+
+| State when right-clicked | Behavior |
+| --- | --- |
+| Something is selected | Copy it to the system clipboard and clear the selection |
+| Nothing is selected | Read the clipboard and paste it into the terminal (newlines converted per terminal semantics) |
+
+Pasting goes through xterm's paste path, so bracketed paste and friends behave exactly as with
+`Ctrl+V`. If the browser denies clipboard access (for example outside a secure context) it fails
+silently: no error, no damaged terminal.
 
 ## Configuration
 
