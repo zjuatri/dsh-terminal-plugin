@@ -153,6 +153,7 @@ export function PanelHost(props: PanelHostProps): unknown {
     onExit: (exitCode: number | null) => { store.markExited(entry.id, exitCode) },
     onTitle: (title: string) => { onTitle(entry.id, title) },
     onOutput: () => { onOutput(entry.id) },
+    onMissing: () => { void store.recoverMissingTerminal(entry.id) },
   }))
 
   return h('div', {

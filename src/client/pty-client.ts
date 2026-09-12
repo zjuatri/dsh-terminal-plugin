@@ -30,7 +30,7 @@ export interface ConnectionSink {
   /** 连接状态变化（用于标签上的小圆点与提示条）。 */
   state(state: ConnectionState): void
   /** 协议层或宿主返回的错误。 */
-  error(message: string): void
+  error(message: string, code: Extract<ServerFrame, { type: 'error' }>['code']): void
 }
 
 /** 重连退避参数。 */
@@ -218,7 +218,7 @@ export class TerminalConnection {
         this.sink?.exit(frame.exitCode)
         return
       case 'error':
-        this.sink?.error(frame.message)
+        this.sink?.error(frame.message, frame.code)
         return
       default:
         return

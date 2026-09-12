@@ -119,6 +119,12 @@ export interface TerminalPanelStore {
   markOutput(id: string): void
   /** 与宿主对账（挂载时调用一次）。 */
   refresh(): Promise<void>
+  /**
+   * 宿主已不认识某个前端仍在显示的终端时，重新对账并按需补建。
+   *
+   * 典型场景是宿主重启：PTY 注册表在进程内，旧标签的 id 则仍在浏览器内存中。
+   */
+  recoverMissingTerminal(id: string): Promise<void>
   /** 清掉一次性提示。 */
   clearNotice(): void
 }
@@ -178,6 +184,7 @@ export function createTerminalPanelStore(options: StoreOptions = {}): TerminalPa
     notice: null,
   }
   const listeners = new Set<() => void>()
+  let recovery: Promise<void> | null = null
 
   /** 发布一个新快照（浅比较由调用方负责；这里只在真的变了时通知）。 */
   const publish = (patch: Partial<PanelSnapshot>): void => {
@@ -354,6 +361,15 @@ export function createTerminalPanelStore(options: StoreOptions = {}): TerminalPa
       } catch (error) {
         publish({ notice: error instanceof Error ? error.message : String(error) })
       }
+    },
+    recoverMissingTerminal(id) {
+      if (!snapshot.terminals.some(entry => entry.id === id)) return Promise.resolve()
+      if (recovery !== null) return recovery
+      recovery = (async () => {
+        await store.refresh()
+        if (snapshot.visible && snapshot.count === 0 && autoCreateTerminals) await store.create()
+      })()
+      return recovery.finally(() => { recovery = null })
     },
     clearNotice() {
       if (snapshot.notice === null) return

@@ -27,7 +27,7 @@ async function loadSelftest() {
  * 造一个假的宿主：POST 发号、DELETE 记账、GET 返回现存终端。
  *
  * @param {object} [overrides] 传给 store 的覆盖项（例如 `autoCreateTerminals: false`）。
- * @returns {Promise<{ store: object, calls: { method: string }[], live: () => number }>}
+ * @returns {Promise<{ store: object, calls: { method: string }[], live: () => number, forgetAll: () => void }>}
  */
 async function makeStore(overrides = {}) {
   const { createTerminalPanelStore } = await loadSelftest()
@@ -81,7 +81,7 @@ async function makeStore(overrides = {}) {
     fetchImpl,
     ...overrides,
   })
-  return { store, calls, live: () => alive.length }
+  return { store, calls, live: () => alive.length, forgetAll: () => { alive.length = 0 } }
 }
 
 /** 等一次创建/删除请求落地（`readJson` 里还有一层 await）。 */
@@ -182,6 +182,22 @@ describe('面板 store', () => {
     assert.equal(store.getSnapshot().count, 1, '对账后仍是那一个')
     assert.equal(calls.length, before + 1, '对账只该多一次 GET')
     assert.equal(calls[calls.length - 1].method, 'GET')
+  })
+
+  test('宿主忘记旧终端时，对账并为打开的面板补建终端', async () => {
+    const { store, calls, live, forgetAll } = await makeStore()
+    store.toggle()
+    await settle()
+    const staleId = store.getSnapshot().terminals[0].id
+    forgetAll()
+
+    await store.recoverMissingTerminal(staleId)
+    await settle()
+
+    assert.equal(live(), 1)
+    assert.equal(store.getSnapshot().count, 1)
+    assert.notEqual(store.getSnapshot().terminals[0].id, staleId)
+    assert.deepEqual(calls.map(call => call.method), ['POST', 'GET', 'POST'])
   })
 
   test('create 会展开面板；setVisible(false) 只收起、不动终端', async () => {

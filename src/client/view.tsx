@@ -37,6 +37,8 @@ export interface TerminalViewProps {
   onTitle(title: string): void
   /** 有新输出。 */
   onOutput(): void
+  /** 宿主已不认识该终端时，重新与宿主对账。 */
+  onMissing(): void
 }
 
 /** 渲染器与连接都就绪之前的状态。 */
@@ -58,7 +60,7 @@ const RESIZE_THROTTLE_MS = 150
  * @returns 一个占满父容器的元素。
  */
 export function TerminalView(props: TerminalViewProps): unknown {
-  const { terminalId, active, visible, t, onExit, onTitle, onOutput } = props
+  const { terminalId, active, visible, t, onExit, onTitle, onOutput, onMissing } = props
   const containerRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<XtermTerminal | null>(null)
   const fitRef = useRef<FitAddonLike | null>(null)
@@ -69,8 +71,8 @@ export function TerminalView(props: TerminalViewProps): unknown {
   const [attempt, setAttempt] = useState(0)
 
   // 回调放进 ref，这样重建渲染器的 effect 不必依赖父组件传下来的函数身份。
-  const callbacks = useRef({ onExit, onTitle, onOutput, t })
-  callbacks.current = { onExit, onTitle, onOutput, t }
+  const callbacks = useRef({ onExit, onTitle, onOutput, onMissing, t })
+  callbacks.current = { onExit, onTitle, onOutput, onMissing, t }
 
   // ── 渲染器 + 连接（每次重试 attempt 变一次） ──────────────────────────────
   useEffect(() => {
@@ -133,7 +135,13 @@ export function TerminalView(props: TerminalViewProps): unknown {
           callbacks.current.onExit(exitCode)
         },
         state: (state) => { if (!disposed) setConnection(state) },
-        error: (message) => { terminal.writeln(`\u001b[31m${message}\u001b[0m`) },
+        error: (message, code) => {
+          terminal.writeln(`\u001b[31m${message}\u001b[0m`)
+          if (code === 'NO_TERMINAL') {
+            connection.close()
+            callbacks.current.onMissing()
+          }
+        },
       }, { cols: terminal.cols, rows: terminal.rows })
 
       if (!disposed) setPhase('ready')
